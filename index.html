@@ -1,7 +1,29 @@
 <!DOCTYPE html>
 <html>
+<head>
+    <meta charset="UTF-8">
+    <title>DevOne</title>
+    <style>
+        body { background: #000; color: #0f0; font-family: monospace; text-align: center; padding: 20px; }
+        input { background: #222; color: #0f0; border: 1px solid #0f0; padding: 10px; }
+        iframe { width: 100%; height: 90vh; display: none; border: none; margin-top: 10px; }
+    </style>
+</head>
 <body>
-  <h1>Chào mừng đến với devone.top!</h1>
-  <p>Trang web đang được khởi tạo.</p>
+    <div id="lock">
+        <h2>DEVONE ACCESS</h2>
+        <input type="password" id="p" placeholder="Nhập mã..." onchange="go()">
+    </div>
+    
+    <iframe id="s" src="https://docs.google.com/spreadsheets/d/e/2PACX-1vT76aoabX3yC8Ct0dmeuWbTPIhiVPoIEB4nh1NQoYz0WvjnePDhTcvTfuJdBdbHLorp-utezUY4pHP0/pubhtml"></iframe>
+
+    <script>
+        function go() {
+            if (document.getElementById('p').value === "12563") { // Thay 123 bằng mã bạn muốn
+                document.getElementById('lock').style.display = 'none';
+                document.getElementById('s').style.display = 'block';
+            } else { alert("Sai mã!"); }
+        }
+    </script>
 </body>
 </html>
