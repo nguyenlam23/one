@@ -1,0 +1,18 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+
+  "name": "devone-dashboard",
+
+  "main": "src/index.js",
+
+  "compatibility_date": "2026-08-16",
+
+  "workers_dev": false,
+
+  "routes": [
+    {
+      "pattern": "devone.top",
+      "custom_domain": true
+    }
+  ]
+}
