@@ -1,6 +1,17 @@
 /******************************************************
  * DEVONE DASHBOARD
  * Google OAuth + Cloudflare KV Session
+ *
+ * VERSION:
+ * - Google OAuth trên Worker
+ * - Session bằng Cloudflare KV
+ * - Proxy Google Apps Script
+ * - Không để script.google.com lộ ra browser
+ ******************************************************/
+
+
+/******************************************************
+ * APPS SCRIPT
  ******************************************************/
 
 const APPS = {
@@ -16,8 +27,6 @@ const APPS = {
 
 /******************************************************
  * EMAIL ĐƯỢC PHÉP
- *
- * Đổi thành email thực tế.
  ******************************************************/
 
 const ALLOWED_EMAILS = [
@@ -79,7 +88,10 @@ export default {
     }
     catch (error) {
 
-      console.error(error);
+      console.error(
+        "WORKER ERROR:",
+        error
+      );
 
       return new Response(
         "Internal Server Error",
@@ -87,7 +99,10 @@ export default {
           status: 500,
           headers: {
             "Content-Type":
-              "text/plain; charset=UTF-8"
+              "text/plain; charset=UTF-8",
+
+            "Cache-Control":
+              "no-store"
           }
         }
       );
@@ -143,11 +158,13 @@ async function handleRequest(
       ),
       {
         headers: {
+
           "Content-Type":
             "text/html; charset=UTF-8",
 
           "Cache-Control":
             "no-store"
+
         }
       }
     );
@@ -204,7 +221,7 @@ async function handleRequest(
 
 
   /****************************************************
-   * DASHBOARD
+   * DASHBOARD APP
    ****************************************************/
 
   const appKey =
@@ -218,7 +235,11 @@ async function handleRequest(
     return new Response(
       "404 - Not Found",
       {
-        status: 404
+        status: 404,
+        headers: {
+          "Cache-Control":
+            "no-store"
+        }
       }
     );
 
@@ -292,11 +313,13 @@ async function googleLogin(
     state,
 
     JSON.stringify({
-      continueUrl: continueUrl
+      continueUrl:
+        continueUrl
     }),
 
     {
-      expirationTtl: 600
+      expirationTtl:
+        600
     }
 
   );
@@ -436,11 +459,14 @@ async function googleCallback(
       GOOGLE_TOKEN_URL,
       {
 
-        method: "POST",
+        method:
+          "POST",
 
         headers: {
+
           "Content-Type":
             "application/x-www-form-urlencoded"
+
         },
 
         body:
@@ -470,6 +496,7 @@ async function googleCallback(
   if (!tokenResponse.ok) {
 
     console.error(
+      "GOOGLE TOKEN ERROR:",
       await tokenResponse.text()
     );
 
@@ -485,7 +512,7 @@ async function googleCallback(
 
 
   /****************************************************
-   * LẤY THÔNG TIN USER
+   * LẤY USER INFO
    ****************************************************/
 
   const userResponse =
@@ -536,7 +563,7 @@ async function googleCallback(
     !ALLOWED_EMAILS
       .map(
         e =>
-          e.toLowerCase()
+          e.trim().toLowerCase()
       )
       .includes(email)
   ) {
@@ -544,49 +571,54 @@ async function googleCallback(
     return new Response(
 
       `
-      <!DOCTYPE html>
+<!DOCTYPE html>
 
-      <html lang="vi">
+<html lang="vi">
 
-      <head>
-        <meta charset="UTF-8">
-        <title>Không có quyền</title>
-      </head>
+<head>
+  <meta charset="UTF-8">
+  <title>Không có quyền</title>
+</head>
 
-      <body style="
-        font-family:Arial;
-        text-align:center;
-        padding:60px;
-      ">
+<body style="
+  font-family:Arial;
+  text-align:center;
+  padding:60px;
+">
 
-        <h1>🚫 Không có quyền truy cập</h1>
+  <h1>🚫 Không có quyền truy cập</h1>
 
-        <p>
-          Tài khoản:
-          <b>${escapeHtml(email)}</b>
-        </p>
+  <p>
+    Tài khoản:
+    <b>${escapeHtml(email)}</b>
+  </p>
 
-        <p>
-          Email này chưa được cấp quyền sử dụng Dashboard.
-        </p>
+  <p>
+    Email này chưa được cấp quyền sử dụng Dashboard.
+  </p>
 
-        <p>
-          <a href="/logout">
-            Đăng xuất
-          </a>
-        </p>
+  <p>
+    <a href="/logout">
+      Đăng xuất
+    </a>
+  </p>
 
-      </body>
+</body>
 
-      </html>
+</html>
       `,
 
       {
         status: 403,
 
         headers: {
+
           "Content-Type":
-            "text/html; charset=UTF-8"
+            "text/html; charset=UTF-8",
+
+          "Cache-Control":
+            "no-store"
+
         }
 
       }
@@ -776,7 +808,10 @@ async function logout(
 
         "Set-Cookie":
           SESSION_COOKIE +
-          "=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0"
+          "=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0",
+
+        "Cache-Control":
+          "no-store"
 
       }
 
@@ -788,6 +823,24 @@ async function logout(
 
 /******************************************************
  * PROXY GOOGLE APPS SCRIPT
+ *
+ * QUAN TRỌNG:
+ *
+ * Browser:
+ *
+ *   dash.devone.top/coc-no
+ *
+ * Worker:
+ *
+ *   fetch Apps Script
+ *
+ * Nếu Apps Script trả:
+ *
+ *   302 Location: https://script.googleusercontent.com/...
+ *
+ * Worker tự fetch tiếp.
+ *
+ * Browser KHÔNG nhận Location đó.
  ******************************************************/
 
 async function proxyGoogleScript(
@@ -802,89 +855,140 @@ async function proxyGoogleScript(
     );
 
 
-  const targetUrl =
+  const baseTarget =
     new URL(
       APPS[appKey]
     );
 
 
-  /*
-   * Giữ query
-   */
+  /****************************************************
+   * GIỮ QUERY
+   ****************************************************/
 
-  targetUrl.search =
+  baseTarget.search =
     incomingUrl.search;
 
 
+  /****************************************************
+   * HEADER CHO REQUEST TỚI GOOGLE
+   *
+   * Không gửi cookie session của Worker.
+   ****************************************************/
+
   const headers =
-    new Headers(
-      request.headers
+    new Headers();
+
+
+  for (
+    const [
+      key,
+      value
+    ]
+    of request.headers
+  ) {
+
+    const lower =
+      key.toLowerCase();
+
+
+    if (
+      lower === "host" ||
+      lower === "cookie" ||
+      lower === "authorization" ||
+      lower === "cf-connecting-ip" ||
+      lower === "cf-ipcountry" ||
+      lower === "cf-ray" ||
+      lower === "cf-visitor"
+    ) {
+
+      continue;
+
+    }
+
+
+    headers.set(
+      key,
+      value
     );
 
-
-  /*
-   * Xóa header của domain Worker
-   */
-
-  headers.delete(
-    "host"
-  );
-
-  headers.delete(
-    "cf-connecting-ip"
-  );
-
-  headers.delete(
-    "cf-ipcountry"
-  );
-
-  headers.delete(
-    "cf-ray"
-  );
+  }
 
 
-  const googleRequest =
-    new Request(
+  /****************************************************
+   * USER AGENT
+   ****************************************************/
 
-      targetUrl.toString(),
+  if (
+    !headers.has(
+      "User-Agent"
+    )
+  ) {
 
-      {
-
-        method:
-          request.method,
-
-        headers:
-          headers,
-
-        body:
-          (
-            request.method === "GET" ||
-            request.method === "HEAD"
-          )
-            ? undefined
-            : request.body,
-
-        redirect:
-          "manual"
-
-      }
-
+    headers.set(
+      "User-Agent",
+      "Mozilla/5.0"
     );
+
+  }
+
+
+  /****************************************************
+   * REQUEST BODY
+   ****************************************************/
+
+  const body =
+    (
+      request.method === "GET" ||
+      request.method === "HEAD"
+    )
+      ? undefined
+      : request.body;
+
+
+  /****************************************************
+   * FETCH APPS SCRIPT
+   *
+   * redirect = manual
+   ****************************************************/
+
+  let currentUrl =
+    baseTarget;
 
 
   let response =
     await fetch(
-      googleRequest
+
+      new Request(
+        currentUrl.toString(),
+        {
+
+          method:
+            request.method,
+
+          headers:
+            headers,
+
+          body:
+            body,
+
+          redirect:
+            "manual"
+
+        }
+      )
+
     );
 
 
-  /*
-   * Xử lý redirect nội bộ
-   */
+  /****************************************************
+   * FOLLOW REDIRECT
+   *
+   * Tối đa 15 lần.
+   ****************************************************/
 
   for (
     let i = 0;
-    i < 10;
+    i < 15;
     i++
   ) {
 
@@ -894,6 +998,10 @@ async function proxyGoogleScript(
       );
 
 
+    /**************************************************
+     * Không redirect nữa
+     **************************************************/
+
     if (!location) {
       break;
     }
@@ -902,117 +1010,143 @@ async function proxyGoogleScript(
     const redirectUrl =
       new URL(
         location,
-        targetUrl
+        currentUrl
       );
 
 
-    /*
-     * Nếu Google redirect về
-     * script.google.com hoặc
-     * googleusercontent
-     *
-     * Worker tự fetch.
-     */
+    console.log(
+      "Apps Script redirect:",
+      response.status,
+      redirectUrl.hostname,
+      redirectUrl.pathname
+    );
 
-    if (
-      redirectUrl.hostname ===
+
+    /**************************************************
+     * CHỈ FOLLOW REDIRECT NỘI BỘ
+     *
+     * Không redirect browser.
+     **************************************************/
+
+    const hostname =
+      redirectUrl.hostname.toLowerCase();
+
+
+    const isGoogleInternal =
+      hostname ===
         "script.google.com" ||
 
-      redirectUrl.hostname ===
+      hostname ===
         "script.googleusercontent.com" ||
 
-      redirectUrl.hostname.endsWith(
+      hostname.endsWith(
         ".googleusercontent.com"
-      )
-    ) {
-
-      targetUrl.href =
-        redirectUrl.href;
+      );
 
 
-      response =
-        await fetch(
+    if (!isGoogleInternal) {
 
-          new Request(
-            targetUrl.toString(),
-            {
+      /************************************************
+       * Nếu Google trả redirect ra domain khác
+       * thì KHÔNG đẩy browser đi.
+       *
+       * Trả lỗi để không làm lộ Apps Script URL.
+       ************************************************/
 
-              method:
-                request.method,
-
-              headers:
-                headers,
-
-              body:
-                (
-                  request.method === "GET" ||
-                  request.method === "HEAD"
-                )
-                  ? undefined
-                  : request.body,
-
-              redirect:
-                "manual"
-
-            }
-          )
-
-        );
-
-
-      continue;
-
-    }
-
-
-    /*
-     * Google Login
-     *
-     * KHÔNG cho URL script.google.com
-     * lộ ra browser.
-     *
-     * Tuy nhiên nếu Apps Script yêu cầu
-     * Google login thì browser vẫn phải
-     * có phiên Google tương ứng.
-     */
-
-    if (
-      redirectUrl.hostname ===
-        "accounts.google.com"
-    ) {
-
-      const headers =
-        new Headers(
-          response.headers
-        );
-
-
-      headers.set(
-        "Location",
+      console.error(
+        "BLOCKED EXTERNAL REDIRECT:",
         redirectUrl.toString()
       );
 
 
       return new Response(
-        null,
+
+        "Ứng dụng đích yêu cầu redirect ra ngoài domain proxy.",
+
         {
 
-          status:
-            response.status,
+          status: 502,
 
-          headers:
-            headers
+          headers: {
+
+            "Content-Type":
+              "text/plain; charset=UTF-8",
+
+            "Cache-Control":
+              "no-store"
+
+          }
 
         }
+
       );
 
     }
 
 
-    break;
+    /**************************************************
+     * FOLLOW REDIRECT BẰNG WORKER
+     **************************************************/
+
+    currentUrl =
+      redirectUrl;
+
+
+    response =
+      await fetch(
+
+        new Request(
+          currentUrl.toString(),
+          {
+
+            method:
+              request.method,
+
+            headers:
+              headers,
+
+            body:
+              (
+                request.method === "GET" ||
+                request.method === "HEAD"
+              )
+                ? undefined
+                : request.body,
+
+            redirect:
+              "manual"
+
+          }
+        )
+
+      );
 
   }
 
+
+  /****************************************************
+   * KIỂM TRA NẾU VẪN CÒN LOCATION
+   ****************************************************/
+
+  if (
+    response.headers.has(
+      "Location"
+    )
+  ) {
+
+    console.error(
+      "TOO MANY REDIRECTS:",
+      response.headers.get(
+        "Location"
+      )
+    );
+
+  }
+
+
+  /****************************************************
+   * RESPONSE HEADERS
+   ****************************************************/
 
   const responseHeaders =
     new Headers(
@@ -1020,40 +1154,61 @@ async function proxyGoogleScript(
     );
 
 
-  /*
-   * Không để redirect Google
-   * thoát ra browser.
-   */
+  /****************************************************
+   * TUYỆT ĐỐI KHÔNG ĐỂ LOCATION
+   * CỦA APPS SCRIPT RA BROWSER
+   ****************************************************/
 
   responseHeaders.delete(
     "Location"
   );
 
 
-  /*
-   * Google có thể trả các header
-   * không phù hợp khi reverse proxy.
-   */
+  /****************************************************
+   * KHÔNG GỬI COOKIE CỦA GOOGLE
+   ****************************************************/
+
+  responseHeaders.delete(
+    "Set-Cookie"
+  );
+
+
+  /****************************************************
+   * CSP CỦA GOOGLE CÓ THỂ PHÁ PROXY
+   ****************************************************/
 
   responseHeaders.delete(
     "Content-Security-Policy"
   );
-
 
   responseHeaders.delete(
     "Content-Security-Policy-Report-Only"
   );
 
 
-  /*
-   * Cookie Google không nên
-   * được gửi sang domain Worker.
-   */
+  /****************************************************
+   * GOOGLE FRAME OPTIONS
+   ****************************************************/
 
   responseHeaders.delete(
-    "Set-Cookie"
+    "X-Frame-Options"
   );
 
+
+  /****************************************************
+   * CONTENT-LOCATION
+   *
+   * Không để browser biết URL googleusercontent.
+   ****************************************************/
+
+  responseHeaders.delete(
+    "Content-Location"
+  );
+
+
+  /****************************************************
+   * RESPONSE
+   ****************************************************/
 
   return new Response(
 
@@ -1101,6 +1256,7 @@ function getAppKey(
     }
 
   }
+
 
   return null;
 
@@ -1154,7 +1310,7 @@ function redirect(
 
 
 /******************************************************
- * ERROR
+ * ERROR PAGE
  ******************************************************/
 
 function errorPage(
@@ -1163,47 +1319,54 @@ function errorPage(
 
   return new Response(
 
-    `
-    <!DOCTYPE html>
+`
+<!DOCTYPE html>
 
-    <html lang="vi">
+<html lang="vi">
 
-    <head>
-      <meta charset="UTF-8">
-      <title>Lỗi</title>
-    </head>
+<head>
 
-    <body style="
-      font-family:Arial;
-      padding:60px;
-      text-align:center;
-    ">
+  <meta charset="UTF-8">
 
-      <h1>❌ Có lỗi</h1>
+  <title>Lỗi</title>
 
-      <p>
-        ${escapeHtml(message)}
-      </p>
+</head>
 
-      <p>
-        <a href="/">
-          Về trang chủ
-        </a>
-      </p>
+<body style="
+  font-family:Arial;
+  padding:60px;
+  text-align:center;
+">
 
-    </body>
+  <h1>❌ Có lỗi</h1>
 
-    </html>
-    `,
+  <p>
+    ${escapeHtml(message)}
+  </p>
+
+  <p>
+    <a href="/">
+      Về trang chủ
+    </a>
+  </p>
+
+</body>
+
+</html>
+`,
 
     {
 
-      status: 500,
+      status:
+        500,
 
       headers: {
 
         "Content-Type":
-          "text/html; charset=UTF-8"
+          "text/html; charset=UTF-8",
+
+        "Cache-Control":
+          "no-store"
 
       }
 
@@ -1417,22 +1580,27 @@ function escapeHtml(
   return String(
     value || ""
   )
+
     .replace(
       /&/g,
       "&amp;"
     )
+
     .replace(
       /</g,
       "&lt;"
     )
+
     .replace(
       />/g,
       "&gt;"
     )
+
     .replace(
       /"/g,
       "&quot;"
     )
+
     .replace(
       /'/g,
       "&#039;"
