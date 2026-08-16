@@ -11,7 +11,7 @@
 
   "routes": [
     {
-      "pattern": "devone.top",
+      "pattern": "dash.devone.top",
       "custom_domain": true
     }
   ]
