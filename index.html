@@ -1,36 +1,187 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bảng Tính Toàn Màn Hình</title>
-    <style>
-        /* Xóa bỏ khoảng trắng thừa của trình duyệt */
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        html, body {
-            width: 100%;
-            height: 100%;
-            overflow: hidden; /* Ẩn thanh cuộn của trang web chính */
-            background-color: #fff;
-        }
-        /* Cấu hình iframe chiếm trọn 100% chiều rộng và chiều cao màn hình */
-        iframe {
-            width: 100%;
-            height: 100%;
-            border: none;
-            display: block;
-        }
-    </style>
+  <meta charset="UTF-8">
+
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  >
+
+  <title>Dashboard Portal</title>
+
+  <link rel="stylesheet" href="style.css">
 </head>
+
 <body>
 
-    <!-- Thay link xuất bản của bạn vào phần src bên dưới -->
-    <iframe src="https://docs.google.com/spreadsheets/d/1uKnlX48hRt3nmpyqeottDNPcDoSl328xj1CjkzCEfSw/"></iframe>
-    <!--<iframe src="https://docs.google.com/spreadsheets/d/e/2PACX-1vSuoi7sGA0bqKaqhcbAbNFhO7Cp7hq3VM9nYnyYZD5ZXnnOeEdlCHkyJQCVvK5JZRj0JEkr1pm2P0Y8/pubhtml?widget=true&amp;headers=false"></iframe>-->
+  <div class="background-glow glow-1"></div>
+  <div class="background-glow glow-2"></div>
+
+
+  <main class="portal">
+
+
+    <!-- LOGO -->
+
+    <div class="logo">
+
+      <span>📊</span>
+
+    </div>
+
+
+    <!-- TITLE -->
+
+    <div class="header">
+
+      <div class="badge">
+        DASHBOARD SYSTEM
+      </div>
+
+      <h1>
+        Trung tâm Dashboard
+      </h1>
+
+      <p>
+        Chọn hệ thống bạn muốn truy cập
+      </p>
+
+    </div>
+
+
+    <!-- DASHBOARD -->
+
+    <section class="dashboard-grid">
+
+
+      <!-- CỌC & NỢ -->
+
+      <a
+        class="dashboard-card blue"
+        href="https://script.google.com/macros/s/WEB_APP_COC_NO/exec"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+
+        <div class="card-top">
+
+          <div class="card-icon">
+            💰
+          </div>
+
+          <div class="status">
+            <span class="status-dot"></span>
+            Online
+          </div>
+
+        </div>
+
+
+        <div class="card-body">
+
+          <h2>
+            Dashboard Cọc & Nợ
+          </h2>
+
+          <p>
+            Theo dõi cọc chưa dùng, công nợ
+            và tình trạng khách hàng.
+          </p>
+
+        </div>
+
+
+        <div class="card-footer">
+
+          <span>
+            Mở Dashboard
+          </span>
+
+          <span class="arrow">
+            →
+          </span>
+
+        </div>
+
+      </a>
+
+
+      <!-- GIAO DỊCH -->
+
+      <a
+        class="dashboard-card green"
+        href="https://script.google.com/macros/s/WEB_APP_GIAO_DICH/exec"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+
+        <div class="card-top">
+
+          <div class="card-icon">
+            📊
+          </div>
+
+          <div class="status">
+            <span class="status-dot"></span>
+            Online
+          </div>
+
+        </div>
+
+
+        <div class="card-body">
+
+          <h2>
+            Dashboard Giao Dịch
+          </h2>
+
+          <p>
+            Tìm kiếm, kiểm tra và theo dõi
+            các giao dịch theo thời gian.
+          </p>
+
+        </div>
+
+
+        <div class="card-footer">
+
+          <span>
+            Mở Dashboard
+          </span>
+
+          <span class="arrow">
+            →
+          </span>
+
+        </div>
+
+      </a>
+
+
+    </section>
+
+
+    <!-- FOOTER -->
+
+    <footer>
+
+      <span>
+        © 2026 Dashboard System
+      </span>
+
+      <span class="separator">
+        •
+      </span>
+
+      <span>
+        Internal Portal
+      </span>
+
+    </footer>
+
+
+  </main>
 
 </body>
 </html>
