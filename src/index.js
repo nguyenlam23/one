@@ -8,28 +8,7 @@ const APPS = {
 
 
 // ====================================================
-// TÌM ROUTE TƯƠNG ỨNG
-// ====================================================
-
-function getAppKey(pathname) {
-
-  for (const key of Object.keys(APPS)) {
-
-    if (
-      pathname === key ||
-      pathname.startsWith(key + "/")
-    ) {
-      return key;
-    }
-
-  }
-
-  return null;
-}
-
-
-// ====================================================
-// HTML TRANG CHỦ
+// TRANG CHỦ
 // ====================================================
 
 function homePage() {
@@ -57,15 +36,11 @@ function homePage() {
 }
 
 body {
-
   margin: 0;
-
   min-height: 100vh;
 
   display: flex;
-
   align-items: center;
-
   justify-content: center;
 
   background:
@@ -79,15 +54,11 @@ body {
     Arial,
     Helvetica,
     sans-serif;
-
 }
 
 .container {
 
-  width: min(
-    92%,
-    520px
-  );
+  width: min(92%, 520px);
 
   padding: 35px;
 
@@ -149,8 +120,7 @@ h1 {
 
 .dashboard-btn:hover {
 
-  transform:
-    translateY(-2px);
+  transform: translateY(-2px);
 
   box-shadow:
     0 8px 20px
@@ -159,15 +129,11 @@ h1 {
 }
 
 .giao-dich {
-
   background: #17365d;
-
 }
 
 .coc-no {
-
   background: #548235;
-
 }
 
 </style>
@@ -211,7 +177,89 @@ h1 {
 
 
 // ====================================================
-// MAIN WORKER
+// TÌM APP
+// ====================================================
+
+function getAppKey(pathname) {
+
+  for (const key of Object.keys(APPS)) {
+
+    if (
+      pathname === key ||
+      pathname.startsWith(key + "/")
+    ) {
+
+      return key;
+
+    }
+
+  }
+
+  return null;
+
+}
+
+
+// ====================================================
+// KIỂM TRA URL GOOGLE NỘI BỘ
+// ====================================================
+
+function isGoogleInternalUrl(url) {
+
+  const hostname =
+    url.hostname.toLowerCase();
+
+
+  return (
+
+    hostname ===
+      "script.google.com"
+
+    ||
+
+    hostname ===
+      "script.googleusercontent.com"
+
+    ||
+
+    hostname.endsWith(
+      ".googleusercontent.com"
+    )
+
+  );
+
+}
+
+
+// ====================================================
+// GOOGLE LOGIN
+//
+// Những URL này phải để browser đi tới Google.
+// ====================================================
+
+function isGoogleLoginUrl(url) {
+
+  const hostname =
+    url.hostname.toLowerCase();
+
+
+  return (
+
+    hostname ===
+      "accounts.google.com"
+
+    ||
+
+    hostname ===
+      "accounts.googleusercontent.com"
+
+  );
+
+}
+
+
+// ====================================================
+// WORKER
 // ====================================================
 
 export default {
@@ -277,21 +325,26 @@ export default {
 
 
     // ==================================================
-    // GOOGLE APP SCRIPT URL
+    // URL APP SCRIPT GỐC
     // ==================================================
 
-    const googleUrl =
+    const appUrl =
       new URL(
         APPS[appKey]
       );
 
 
-    googleUrl.search =
+    /*
+     * Query của người dùng
+     * được chuyển sang Apps Script.
+     */
+
+    appUrl.search =
       url.search;
 
 
     // ==================================================
-    // COPY REQUEST HEADERS
+    // HEADER
     // ==================================================
 
     const headers =
@@ -300,11 +353,8 @@ export default {
       );
 
 
-    // Host phải là Google
     headers.delete("host");
 
-
-    // Một số header không nên chuyển tiếp
     headers.delete(
       "cf-connecting-ip"
     );
@@ -319,47 +369,206 @@ export default {
 
 
     // ==================================================
-    // TẠO REQUEST GOOGLE
+    // REQUEST BAN ĐẦU
     // ==================================================
 
-    const googleRequest =
-      new Request(
-        googleUrl.toString(),
-        {
+    let targetUrl =
+      appUrl;
 
-          method:
-            request.method,
+
+    let response;
+
+
+    // ==================================================
+    // THEO REDIRECT NỘI BỘ CỦA GOOGLE
+    //
+    // Tối đa 10 lần để tránh loop.
+    // ==================================================
+
+    for (
+      let attempt = 0;
+      attempt < 10;
+      attempt++
+    ) {
+
+      const googleRequest =
+        new Request(
+          targetUrl.toString(),
+          {
+
+            method:
+              request.method,
+
+            headers:
+              headers,
+
+            body:
+              (
+                request.method === "GET" ||
+                request.method === "HEAD"
+              )
+                ? undefined
+                : request.body,
+
+            redirect:
+              "manual"
+
+          }
+        );
+
+
+      response =
+        await fetch(
+          googleRequest
+        );
+
+
+      const location =
+        response.headers.get(
+          "Location"
+        );
+
+
+      // Không có redirect
+      if (!location) {
+        break;
+      }
+
+
+      const redirectUrl =
+        new URL(
+          location,
+          targetUrl
+        );
+
+
+      // ==================================================
+      // GOOGLE LOGIN
+      //
+      // Cho browser đi tới Google.
+      // ==================================================
+
+      if (
+        isGoogleLoginUrl(
+          redirectUrl
+        )
+      ) {
+
+        const redirectHeaders =
+          new Headers(
+            response.headers
+          );
+
+
+        redirectHeaders.set(
+          "Location",
+          redirectUrl.toString()
+        );
+
+
+        return new Response(
+          null,
+          {
+            status:
+              response.status,
+
+            headers:
+              redirectHeaders
+          }
+        );
+
+      }
+
+
+      // ==================================================
+      // REDIRECT NỘI BỘ GOOGLE
+      //
+      // Worker tự fetch.
+      //
+      // Browser KHÔNG thấy URL này.
+      // ==================================================
+
+      if (
+        isGoogleInternalUrl(
+          redirectUrl
+        )
+      ) {
+
+        targetUrl =
+          redirectUrl;
+
+        continue;
+
+      }
+
+
+      // ==================================================
+      // REDIRECT VỀ DOMAIN CỦA MÌNH
+      // ==================================================
+
+      if (
+        redirectUrl.hostname ===
+        url.hostname
+      ) {
+
+        const redirectHeaders =
+          new Headers(
+            response.headers
+          );
+
+
+        redirectHeaders.set(
+          "Location",
+          redirectUrl.toString()
+        );
+
+
+        return new Response(
+          null,
+          {
+            status:
+              response.status,
+
+            headers:
+              redirectHeaders
+          }
+        );
+
+      }
+
+
+      // ==================================================
+      // REDIRECT KHÁC
+      // ==================================================
+
+      const redirectHeaders =
+        new Headers(
+          response.headers
+        );
+
+
+      redirectHeaders.set(
+        "Location",
+        redirectUrl.toString()
+      );
+
+
+      return new Response(
+        null,
+        {
+          status:
+            response.status,
 
           headers:
-            headers,
-
-          body:
-            (
-              request.method === "GET" ||
-              request.method === "HEAD"
-            )
-              ? undefined
-              : request.body,
-
-          redirect:
-            "manual"
-
+            redirectHeaders
         }
       );
 
-
-    // ==================================================
-    // GỌI GOOGLE
-    // ==================================================
-
-    let response =
-      await fetch(
-        googleRequest
-      );
+    }
 
 
     // ==================================================
-    // XỬ LÝ REDIRECT
+    // RESPONSE CUỐI CÙNG
     // ==================================================
 
     const responseHeaders =
@@ -368,38 +577,25 @@ export default {
       );
 
 
-    const location =
-      responseHeaders.get(
-        "Location"
-      );
+    /*
+     * Không để Google gửi Location
+     * ra browser nữa.
+     */
+
+    responseHeaders.delete(
+      "Location"
+    );
 
 
-    if (location) {
+    /*
+     * Một số header Google không nên
+     * expose trực tiếp.
+     */
 
-      const newLocation =
-        rewriteRedirect(
-          location,
-          googleUrl,
-          url,
-          appKey
-        );
+    responseHeaders.delete(
+      "Content-Security-Policy"
+    );
 
-
-      if (newLocation) {
-
-        responseHeaders.set(
-          "Location",
-          newLocation
-        );
-
-      }
-
-    }
-
-
-    // ==================================================
-    // TRẢ RESPONSE
-    // ==================================================
 
     return new Response(
 
@@ -423,158 +619,3 @@ export default {
   }
 
 };
-
-
-// ====================================================
-// REWRITE REDIRECT
-// ====================================================
-
-function rewriteRedirect(
-  location,
-  googleUrl,
-  currentUrl,
-  appKey
-) {
-
-  try {
-
-    const redirectUrl =
-      new URL(
-        location,
-        googleUrl
-      );
-
-
-    // ==================================================
-    // 1. GOOGLE LOGIN
-    //
-    // TUYỆT ĐỐI KHÔNG rewrite
-    //
-    // accounts.google.com phải giữ nguyên.
-    // ==================================================
-
-    if (
-      redirectUrl.hostname ===
-      "accounts.google.com"
-    ) {
-
-      return redirectUrl.toString();
-
-    }
-
-
-    if (
-      redirectUrl.hostname.endsWith(
-        ".google.com"
-      ) &&
-      !redirectUrl.hostname.includes(
-        "script.google.com"
-      )
-    ) {
-
-      return redirectUrl.toString();
-
-    }
-
-
-    // ==================================================
-    // 2. SCRIPT.GOOGLE.COM
-    //
-    // Đây là redirect của Apps Script.
-    // Đưa nó trở lại route riêng.
-    // ==================================================
-
-    if (
-      redirectUrl.hostname ===
-      "script.google.com"
-    ) {
-
-      const newUrl =
-        new URL(
-          currentUrl.origin +
-          appKey
-        );
-
-
-      newUrl.search =
-        redirectUrl.search;
-
-
-      /*
-       * Nếu Google redirect tới:
-       *
-       * /macros/s/XXXX/exec
-       *
-       * hoặc các path phụ của Apps Script
-       *
-       * thì vẫn giữ chúng phía sau route.
-       */
-
-      const googlePath =
-        redirectUrl.pathname;
-
-
-      if (
-        googlePath &&
-        googlePath !== "/"
-      ) {
-
-        /*
-         * Chỉ giữ phần path phụ,
-         * không giữ /macros/s/ID/exec.
-         */
-
-        const match =
-          googlePath.match(
-            /^\/macros\/s\/[^/]+\/exec(\/.*)?$/
-          );
-
-
-        if (
-          match &&
-          match[1]
-        ) {
-
-          newUrl.pathname =
-            appKey +
-            match[1];
-
-        }
-
-      }
-
-
-      return newUrl.toString();
-
-    }
-
-
-    // ==================================================
-    // 3. Nếu redirect đã là domain của mình
-    // ==================================================
-
-    if (
-      redirectUrl.hostname ===
-      currentUrl.hostname
-    ) {
-
-      return redirectUrl.toString();
-
-    }
-
-
-    // ==================================================
-    // 4. Các domain khác
-    // giữ nguyên
-    // ==================================================
-
-    return redirectUrl.toString();
-
-  }
-  catch (err) {
-
-    return location;
-
-  }
-
-}
