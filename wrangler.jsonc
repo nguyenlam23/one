@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
 
-  "name": "devone-dashboard",
+  "name": "one",
 
   "main": "src/index.js",
 
