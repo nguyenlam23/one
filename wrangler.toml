@@ -9,4 +9,4 @@ binding = "SESSIONS"
 id = "THAY_KV_NAMESPACE_ID"
 
 [vars]
-GOOGLE_CLIENT_ID = "THAY_GOOGLE_CLIENT_ID"
+GOOGLE_CLIENT_ID = "1004943706337-3lpcs8jej0grpdfppe3e2qgd0f225akl.apps.googleusercontent.com"
