@@ -1,1 +1,12 @@
+name = "one"
 
+main = "src/worker.js"
+
+compatibility_date = "2026-08-16"
+
+[[kv_namespaces]]
+binding = "SESSIONS"
+id = "THAY_KV_NAMESPACE_ID"
+
+[vars]
+GOOGLE_CLIENT_ID = "THAY_GOOGLE_CLIENT_ID"
