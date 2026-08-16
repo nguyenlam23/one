@@ -24,8 +24,8 @@ const ALLOWED_EMAILS = [
 
   "winter.night.2211@gmail.com",
   "clonegame00014@gmail.com",
-  "info@binhannhienhotel.com.vn"
-  "sales.binhannhienhotel@gmail.com"
+  "info@binhannhienhotel.com.vn",
+  "sales.binhannhienhotel@gmail.com",
   "emaasdasdwil3@gmail.com"
 
 ];
