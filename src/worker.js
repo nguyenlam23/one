@@ -22,9 +22,11 @@ const APPS = {
 
 const ALLOWED_EMAILS = [
 
-  "email1@gmail.com",
-  "email2@gmail.com",
-  "email3@gmail.com"
+  "winter.night.2211@gmail.com",
+  "clonegame00014@gmail.com",
+  "info@binhannhienhotel.com.vn"
+  "sales.binhannhienhotel@gmail.com"
+  "emaasdasdwil3@gmail.com"
 
 ];
 
